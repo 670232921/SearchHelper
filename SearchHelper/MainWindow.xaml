@@ -1,0 +1,33 @@
+﻿<Window
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="d" x:Class="SearchHelper.MainWindow"
+        Title="MainWindow" Height="650" Width="640" WindowStyle="None"
+    ShowInTaskbar="False" Topmost="True" WindowStartupLocation="Manual"
+    ResizeMode="NoResize"
+        AllowsTransparency="True" Background="Transparent" Name="SearchHelper"
+    Loaded="SearchHelper_Loaded" WindowState="Normal"
+    PreviewKeyDown="SearchHelper_PreviewKeyDown">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="240"/>
+            <RowDefinition Height="30"/>
+            <RowDefinition/>
+        </Grid.RowDefinitions>
+        
+        <StackPanel Grid.Row="0" Orientation="Vertical" VerticalAlignment="Bottom" Margin="18, 10, 326, 0" MaxHeight="240">
+            <ListView  Name="SuggestListView" Visibility="{Binding Path=HasItems, ElementName=SuggestListView, Converter={StaticResource b2t}}"
+                       SelectionChanged="SuggestListView_SelectionChanged"
+                       PreviewKeyDown="SuggestListView_PreviewKeyDown"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
+            <TextBox Margin="10, 3, 5, 3" Width="450" TextChanged="TextBox_TextChanged" PreviewKeyDown="TextBox_PreviewKeyDown" Loaded="TextBox_Loaded"
+                     Name="SearchInput"/>
+            <Button Width="50" Margin="3" Content="搜索"/>
+            <Button Width="50" Margin="3" Content="翻译"/>
+            <Button Width="50" Margin="3" Content="网站"/>
+        </StackPanel>
+
+    </Grid>
+</Window>
