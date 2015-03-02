@@ -21,6 +21,7 @@ using System.Threading;
 using System.Collections;
 using System.Windows.Interop;
 using System.Windows.Media.Animation;
+using System.Net.NetworkInformation;
 
 
 namespace SearchHelper
@@ -30,6 +31,7 @@ namespace SearchHelper
     /// </summary>
     public partial class MainWindow : Window
     {
+        SearchEngine SearchEngine = SearchEngine.BaiDu;
         long CurrentIndex = 0;
         Queue<HelperObject> SuggestionQueue = new Queue<HelperObject>();
         Queue TranslationQueue = Application.Current.Properties["TranslationQueue"] as Queue;
@@ -80,7 +82,19 @@ namespace SearchHelper
         void Search(string keyWord)
         {
             ShowORHideWindow(false);
-            string url = @"http://www.baidu.com/s?wd=" + WebUtility.UrlEncode(keyWord) + @"&ie=utf-8";
+            string url;
+            switch (SearchEngine)
+            {
+                case SearchEngine.BaiDu:
+                    url = @"http://www.baidu.com/s?wd=" + WebUtility.UrlEncode(keyWord) + @"&ie=utf-8";
+                    break;
+                case SearchEngine.Google:
+                    url = @"http://www.google.com/search?q=" + WebUtility.UrlEncode(keyWord) + "&ie=utf-8&oe=utf-8";
+                    break;
+                default:
+                    url = @"http://www.baidu.com/s?wd=" + WebUtility.UrlEncode(keyWord) + @"&ie=utf-8";
+                    break;
+            }
             System.Diagnostics.Process.Start(url);
             Clean();
         }
@@ -179,6 +193,19 @@ namespace SearchHelper
             this.Left = 50;
             ShowORHideWindow(false);
             //this.Hide();
+            SwitchSearchEngine();
+        }
+
+        void SwitchSearchEngine()
+        {
+            Ping pin = new Ping();
+            pin.SendPingAsync("www.google.com").ContinueWith(task =>
+                {
+                    if (task.Result.Status == IPStatus.Success)
+                    {
+                        SearchEngine = SearchEngine.Google;
+                    }
+                }, TaskScheduler.FromCurrentSynchronizationContext());
         }
 
         void ShowORHideWindow(bool isShow)
@@ -273,6 +300,12 @@ namespace SearchHelper
 
         public  long Index { get; private set; }
         public string KeyWord { get; private set; }
+    }
+
+    public enum SearchEngine
+    {
+        BaiDu,
+        Google
     }
 
     public class HotKey
