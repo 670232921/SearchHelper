@@ -22,6 +22,8 @@ using System.Collections;
 using System.Windows.Interop;
 using System.Windows.Media.Animation;
 using System.Net.NetworkInformation;
+using System.Xml.Serialization;
+using System.IO;
 
 
 namespace SearchHelper
@@ -108,30 +110,73 @@ namespace SearchHelper
 
         Task<List<string>> GetSuggestion(string keyword)
         {
-            return Task.Factory.StartNew(() =>
+            return Task<List<string>>.Factory.StartNew(() =>
                 {
-                    string urlString = @"http://suggestion.baidu.com/su?wd=" + WebUtility.UrlEncode(keyword) + "&action=opensearch&ie=utf-8&from=ie8";
-                    WebClient suggestionClient = new WebClient();
-                    byte[] bytes = suggestionClient.DownloadData(urlString);
-                    string jsonString = UTF8Encoding.UTF8.GetString(bytes);
-
-                    JavaScriptSerializer serializer = new JavaScriptSerializer();
-                    object[] data = serializer.Deserialize<object[]>(jsonString);
-                    if (data != null && data.Length == 2)
+                    switch (SearchEngine)
                     {
-                        object[] datas = data[1] as object[];
-                        if (datas != null && datas.Length > 0)
-                        {
-                            List<string> rcl = new List<string>();
-                            foreach (var dob in datas)
+                        case SearchEngine.BaiDu:
                             {
-                                rcl.Add(dob as string);
-                            }
+                                string urlString = @"http://suggestion.baidu.com/su?wd=" + WebUtility.UrlEncode(keyword) + "&action=opensearch&ie=utf-8&from=ie8";
+                                WebClient suggestionClient = new WebClient();
+                                byte[] bytes = suggestionClient.DownloadData(urlString);
+                                string jsonString = UTF8Encoding.UTF8.GetString(bytes);
 
-                            return rcl;
-                        }
+                                JavaScriptSerializer serializer = new JavaScriptSerializer();
+                                object[] data = serializer.Deserialize<object[]>(jsonString);
+                                if (data != null && data.Length == 2)
+                                {
+                                    object[] datas = data[1] as object[];
+                                    if (datas != null && datas.Length > 0)
+                                    {
+                                        List<string> rcl = new List<string>();
+                                        foreach (var dob in datas)
+                                        {
+                                            rcl.Add(dob as string);
+                                        }
+
+                                        return rcl;
+                                    }
+                                }
+                                break;
+                            }
+                        case SearchEngine.Google:
+                            {
+                                string urlString = @"http://clients5.google.com/complete/search?hl=zh-CN&q=" + WebUtility.UrlEncode(keyword) + @"&client=ie8&inputencoding=UTF-8&outputencoding=UTF-8";
+                                WebClient suggestionClient = new WebClient();
+                                byte[] bytes = suggestionClient.DownloadData(urlString);
+
+                                string dataString = UTF8Encoding.UTF8.GetString(bytes);
+                                string charsetall = suggestionClient.ResponseHeaders[HttpResponseHeader.ContentType];
+                                if (charsetall != null && charsetall.Contains("charset="))
+                                {
+                                    string encodingString = charsetall.Substring(charsetall.IndexOf("charset=") + "charset=".Length);
+                                    dataString = Encoding.GetEncoding(encodingString).GetString(bytes);
+                                }
+
+                                GoogleSuggestion.SearchSuggestion googleSuggestion = null;
+                                using (TextReader reader = new StringReader(dataString))
+                                {
+                                    XmlSerializer serializer = new XmlSerializer(typeof(GoogleSuggestion.SearchSuggestion));
+                                    googleSuggestion = (GoogleSuggestion.SearchSuggestion)serializer.Deserialize(reader);
+                                }
+                                if (googleSuggestion != null)
+                                {
+                                    List<string> rcl = new List<string>();
+                                    foreach (var item in googleSuggestion.Section.Item)
+                                    {
+                                        rcl.Add(item.Text);
+                                    }
+                                    return rcl;
+                                }
+                                break;
+                            }
+                        default:
+                            {
+                                return new List<string>();
+                                break;
+                            }
                     }
-                    return new List<string>();
+                    return null;
                 });
         }
 
@@ -306,6 +351,75 @@ namespace SearchHelper
     {
         BaiDu,
         Google
+    }
+
+    [Serializable()]
+    public class GoogleSuggestion
+    {
+        /// <remarks/>
+        [System.Xml.Serialization.XmlTypeAttribute(AnonymousType = true, Namespace = "http://opensearch.org/searchsuggest2")]
+        [System.Xml.Serialization.XmlRootAttribute(Namespace = "http://opensearch.org/searchsuggest2", IsNullable = false)]
+        public partial class SearchSuggestion
+        {
+            /// <remarks/>
+            public string Query { get; set; }
+
+            /// <remarks/>
+            public SearchSuggestionSection Section {get; set;}
+
+            /// <remarks/>
+            [System.Xml.Serialization.XmlAttributeAttribute()]
+            public decimal version { get; set; }
+        }
+
+        /// <remarks/>
+        [System.Xml.Serialization.XmlTypeAttribute(AnonymousType = true, Namespace = "http://opensearch.org/searchsuggest2")]
+        public partial class SearchSuggestionSection
+        {
+            /// <remarks/>
+            [System.Xml.Serialization.XmlElementAttribute("Item")]
+            public SearchSuggestionSectionItem[] Item { get; set; }
+
+            /// <remarks/>
+            [System.Xml.Serialization.XmlAttributeAttribute()]
+            public string title { get; set; }
+        }
+
+        /// <remarks/>
+        [System.Xml.Serialization.XmlTypeAttribute(AnonymousType = true, Namespace = "http://opensearch.org/searchsuggest2")]
+        public partial class SearchSuggestionSectionItem
+        {
+            /// <remarks/>
+            public string Text { get; set; }
+
+            /// <remarks/>
+            public SearchSuggestionSectionItemImage Image { get; set; }
+        }
+
+        /// <remarks/>
+        [System.Xml.Serialization.XmlTypeAttribute(AnonymousType = true, Namespace = "http://opensearch.org/searchsuggest2")]
+        public partial class SearchSuggestionSectionItemImage
+        {
+            /// <remarks/>
+            [System.Xml.Serialization.XmlAttributeAttribute()]
+            public string source { get; set; }
+
+            /// <remarks/>
+            [System.Xml.Serialization.XmlAttributeAttribute()]
+            public string alt { get; set; }
+
+            /// <remarks/>
+            [System.Xml.Serialization.XmlAttributeAttribute()]
+            public byte width { get; set; }
+
+            /// <remarks/>
+            [System.Xml.Serialization.XmlAttributeAttribute()]
+            public byte height { get; set; }
+
+            /// <remarks/>
+            [System.Xml.Serialization.XmlAttributeAttribute()]
+            public string align { get; set; }
+        }
     }
 
     public class HotKey
