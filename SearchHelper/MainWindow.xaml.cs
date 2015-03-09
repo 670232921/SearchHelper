@@ -33,11 +33,20 @@ namespace SearchHelper
     /// </summary>
     public partial class MainWindow : Window
     {
-        SearchEngine SearchEngine = SearchEngine.BaiDu;
+        SearchEngine DefaultSearchEngine = SearchEngine.BaiDu;
         long CurrentIndex = 0;
         Queue<HelperObject> SuggestionQueue = new Queue<HelperObject>();
         Queue TranslationQueue = Application.Current.Properties["TranslationQueue"] as Queue;
         TranslationWindow TranslationWindow = new TranslationWindow();
+
+        private static SearchEngine GetEngineFromKey()
+        {
+            if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            {
+                return SearchEngine.BaiDu;
+            }
+            return SearchEngine.Default;
+        }
         public MainWindow()
         {
             InitializeComponent();
@@ -60,7 +69,7 @@ namespace SearchHelper
             {
                 case Key.Enter:
                     {
-                        Search(SearchInput.Text);
+                        Search(SearchInput.Text, GetEngineFromKey());
                         e.Handled = true;
                         break;
                     }
@@ -81,11 +90,11 @@ namespace SearchHelper
             }
         }
 
-        void Search(string keyWord)
+        void Search(string keyWord, SearchEngine searchEngine = SearchEngine.Default)
         {
             ShowORHideWindow(false);
             string url;
-            switch (SearchEngine)
+            switch (searchEngine == SearchEngine.Default ? DefaultSearchEngine : searchEngine)
             {
                 case SearchEngine.BaiDu:
                     url = @"http://www.baidu.com/s?wd=" + WebUtility.UrlEncode(keyWord) + @"&ie=utf-8";
@@ -112,7 +121,7 @@ namespace SearchHelper
         {
             return Task<List<string>>.Factory.StartNew(() =>
                 {
-                    switch (SearchEngine)
+                    switch (DefaultSearchEngine)
                     {
                         case SearchEngine.BaiDu:
                             {
@@ -248,7 +257,7 @@ namespace SearchHelper
                 {
                     if (task.Result.Status == IPStatus.Success)
                     {
-                        SearchEngine = SearchEngine.Google;
+                        DefaultSearchEngine = SearchEngine.Google;
                     }
                 }, TaskScheduler.FromCurrentSynchronizationContext());
         }
@@ -320,7 +329,7 @@ namespace SearchHelper
                     {
                         if (SuggestListView.SelectedItem != null)
                         {
-                            Search(SuggestListView.SelectedItem as string);
+                            Search(SuggestListView.SelectedItem as string, GetEngineFromKey());
                             e.Handled = true;
                         }
                         break;
@@ -350,7 +359,8 @@ namespace SearchHelper
     public enum SearchEngine
     {
         BaiDu,
-        Google
+        Google,
+        Default
     }
 
     [Serializable()]
