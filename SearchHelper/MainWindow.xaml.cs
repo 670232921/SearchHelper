@@ -47,6 +47,7 @@ namespace SearchHelper
             }
             return SearchEngine.Default;
         }
+
         public MainWindow()
         {
             InitializeComponent();
@@ -121,71 +122,79 @@ namespace SearchHelper
         {
             return Task<List<string>>.Factory.StartNew(() =>
                 {
-                    switch (DefaultSearchEngine)
+                    try
                     {
-                        case SearchEngine.BaiDu:
-                            {
-                                string urlString = @"http://suggestion.baidu.com/su?wd=" + WebUtility.UrlEncode(keyword) + "&action=opensearch&ie=utf-8&from=ie8";
-                                WebClient suggestionClient = new WebClient();
-                                byte[] bytes = suggestionClient.DownloadData(urlString);
-                                string jsonString = UTF8Encoding.UTF8.GetString(bytes);
-
-                                JavaScriptSerializer serializer = new JavaScriptSerializer();
-                                object[] data = serializer.Deserialize<object[]>(jsonString);
-                                if (data != null && data.Length == 2)
+                        switch (DefaultSearchEngine)
+                        {
+                            case SearchEngine.BaiDu:
                                 {
-                                    object[] datas = data[1] as object[];
-                                    if (datas != null && datas.Length > 0)
+                                    string urlString = @"http://suggestion.baidu.com/su?wd=" + WebUtility.UrlEncode(keyword) + "&action=opensearch&ie=utf-8&from=ie8";
+                                    WebClient suggestionClient = new WebClient();
+                                    byte[] bytes = suggestionClient.DownloadData(urlString);
+                                    string jsonString = UTF8Encoding.UTF8.GetString(bytes);
+
+                                    JavaScriptSerializer serializer = new JavaScriptSerializer();
+                                    object[] data = serializer.Deserialize<object[]>(jsonString);
+                                    if (data != null && data.Length == 2)
+                                    {
+                                        object[] datas = data[1] as object[];
+                                        if (datas != null && datas.Length > 0)
+                                        {
+                                            List<string> rcl = new List<string>();
+                                            foreach (var dob in datas)
+                                            {
+                                                rcl.Add(dob as string);
+                                            }
+
+                                            return rcl;
+                                        }
+                                    }
+                                    break;
+                                }
+                            case SearchEngine.Google:
+                                {
+                                    string urlString = @"http://clients5.google.com/complete/search?hl=zh-CN&q=" + WebUtility.UrlEncode(keyword) + @"&client=ie8&inputencoding=UTF-8&outputencoding=UTF-8";
+                                    WebClient suggestionClient = new WebClient();
+                                    byte[] bytes = suggestionClient.DownloadData(urlString);
+
+                                    string dataString = UTF8Encoding.UTF8.GetString(bytes);
+                                    string charsetall = suggestionClient.ResponseHeaders[HttpResponseHeader.ContentType];
+                                    if (charsetall != null && charsetall.Contains("charset="))
+                                    {
+                                        string encodingString = charsetall.Substring(charsetall.IndexOf("charset=") + "charset=".Length);
+                                        dataString = Encoding.GetEncoding(encodingString).GetString(bytes);
+                                    }
+
+                                    GoogleSuggestion.SearchSuggestion googleSuggestion = null;
+                                    using (TextReader reader = new StringReader(dataString))
+                                    {
+                                        XmlSerializer serializer = new XmlSerializer(typeof(GoogleSuggestion.SearchSuggestion));
+                                        googleSuggestion = (GoogleSuggestion.SearchSuggestion)serializer.Deserialize(reader);
+                                    }
+                                    if (googleSuggestion != null && googleSuggestion.Section != null &&
+                                        googleSuggestion.Section.Item != null && googleSuggestion.Section.Item.Length != 0)
                                     {
                                         List<string> rcl = new List<string>();
-                                        foreach (var dob in datas)
+                                        foreach (var item in googleSuggestion.Section.Item)
                                         {
-                                            rcl.Add(dob as string);
+                                            rcl.Add(item.Text);
                                         }
-
                                         return rcl;
                                     }
+                                    break;
                                 }
-                                break;
-                            }
-                        case SearchEngine.Google:
-                            {
-                                string urlString = @"http://clients5.google.com/complete/search?hl=zh-CN&q=" + WebUtility.UrlEncode(keyword) + @"&client=ie8&inputencoding=UTF-8&outputencoding=UTF-8";
-                                WebClient suggestionClient = new WebClient();
-                                byte[] bytes = suggestionClient.DownloadData(urlString);
-
-                                string dataString = UTF8Encoding.UTF8.GetString(bytes);
-                                string charsetall = suggestionClient.ResponseHeaders[HttpResponseHeader.ContentType];
-                                if (charsetall != null && charsetall.Contains("charset="))
+                            default:
                                 {
-                                    string encodingString = charsetall.Substring(charsetall.IndexOf("charset=") + "charset=".Length);
-                                    dataString = Encoding.GetEncoding(encodingString).GetString(bytes);
+                                    return new List<string>();
+                                    break;
                                 }
-
-                                GoogleSuggestion.SearchSuggestion googleSuggestion = null;
-                                using (TextReader reader = new StringReader(dataString))
-                                {
-                                    XmlSerializer serializer = new XmlSerializer(typeof(GoogleSuggestion.SearchSuggestion));
-                                    googleSuggestion = (GoogleSuggestion.SearchSuggestion)serializer.Deserialize(reader);
-                                }
-                                if (googleSuggestion != null)
-                                {
-                                    List<string> rcl = new List<string>();
-                                    foreach (var item in googleSuggestion.Section.Item)
-                                    {
-                                        rcl.Add(item.Text);
-                                    }
-                                    return rcl;
-                                }
-                                break;
-                            }
-                        default:
-                            {
-                                return new List<string>();
-                                break;
-                            }
+                        }
                     }
-                    return null;
+                    catch (WebException)
+                    {
+                        return new List<string>();
+                    }
+                    return new List<string>();
                 });
         }
 
@@ -274,13 +283,27 @@ namespace SearchHelper
                 TranslationWindow.Left = np.X;
                 TranslationWindow.Top = np.Y;
                 TranslationWindow.Show();
+                OnWindowShow();
             }
             else
             {
                 TranslationWindow.Hide();
+                OnWindowHide();
             }
             
         }
+
+        private void OnWindowShow()
+        {
+            if (Clipboard.ContainsText())
+            {
+                SearchInput.Text = Clipboard.GetText();
+                SearchInput.SelectAll();
+            }
+        }
+
+        private void OnWindowHide()
+        { }
 
         void EnqueueToTranslation(HelperObject ho)
         {
